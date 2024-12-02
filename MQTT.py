@@ -33,6 +33,7 @@ def detect_fire(image_path, threshold=0.6):
 
 # Path to the image
 image_path = "received_image.jpg"  # Replace with the path to your image
+
 ##############Cấu hình MQTT trên máy tính#####################
 # Cấu hình MQTT Broker
 mqtt_server = "bf9e78d9019447609bada8c1a9b76912.s1.eu.hivemq.cloud"  # Thay bằng hostname của bạn
@@ -41,6 +42,15 @@ mqtt_user = "test_MQQT"  # Thay bằng username của bạn
 mqtt_password = "123ABC456abc"  # Thay bằng password của bạn
 topic_subscribe = "sendToPC"  # Topic để nhận tin nhắn
 topic_publish = "sendfromPC"  # Topic để gửi tin nhắn
+
+# Tạo MQTT client
+client = mqtt.Client()
+client.username_pw_set(mqtt_user, mqtt_password)  # Cấu hình username và password
+client.tls_set()  # Kích hoạt kết nối TLS/SSL
+
+# Biến
+cam_value = 0 #chỉnh sau
+
 # Hàm xử lý khi kết nối thành công
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -76,16 +86,29 @@ def on_message(client, userdata, msg):
                 cv2.imwrite("received_image.jpg", img)
             else:
                 print("Failed to decode image.")
-        # Detect fire in the image
-        fire_detected = detect_fire(image_path)
+        # Gọi module phát hiện lửa
+        fire_detected = detect_fire(image_path) # giá trị fire detected trả về 1 nếu là có lửa, 0 là ko có lửa
         client.publish(topic_publish, fire_detected)
+    # Này là mới xử lí một cam thôi, đến sau sẽ test hai cam
+        cam_value = userdata
+        message = msg.payload.decode()
+        input_topic = msg.topic
+        print(f"Received message: {message} on topic {input_topic}")
+
+        mdnh = f"{cam_value}{message}"
+        if mdnh != '000':
+            floorr = input_topic[4]
+            zone = input_topic[6]
+            output_topic = f"lap/{floorr}/{zone}"
+
+            client.publish(output_topic, mdnh)
+            print(f"Published messenge: {mdnh} on topic {output_topic}")
     except Exception as e:
         print(f"Error processing message from topic {msg.topic}: {e}")
 
-# Tạo MQTT client
-client = mqtt.Client()
-client.username_pw_set(mqtt_user, mqtt_password)  # Cấu hình username và password
-client.tls_set()  # Kích hoạt kết nối TLS/SSL
+# Gắn cam_value vào userdata
+client.user_data_set(cam_value)
+
 
 # Gắn hàm callback
 client.on_connect = on_connect
