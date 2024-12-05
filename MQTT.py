@@ -6,7 +6,15 @@ import time
 import functools
 ###############Load model xử lý ảnh####################
 # Load the model
-model = tf.keras.models.load_model("fire_detection_model_transfer_learning.keras")
+# Load the TFLite model
+interpreter = tf.lite.Interpreter(model_path="model.tflite")
+interpreter.allocate_tensors()
+
+# Get input and output details
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+print("Model loaded successfully!")
 
 def detect_fire(image_path, threshold=0.6):
     # Read the image from file
@@ -19,9 +27,16 @@ def detect_fire(image_path, threshold=0.6):
     # Resize and prepare the frame for model input
     preprocess_frame = cv2.cvtColor(cv2.resize(frame, (224, 224)), cv2.COLOR_BGR2RGB)  # Convert to RGB
     preprocess_frame = np.expand_dims(preprocess_frame, axis=0)  # Add batch dimension
+    preprocess_frame = preprocess_frame.astype(np.float32)  # Ensure the input is float32
 
-    # Prediction
-    prediction = model.predict(preprocess_frame)
+    # Set the tensor
+    interpreter.set_tensor(input_details[0]['index'], preprocess_frame)
+
+    # Run the model
+    interpreter.invoke()
+
+    # Get the prediction
+    prediction = interpreter.get_tensor(output_details[0]['index'])
     print(f"Prediction: {prediction[0]}")
     print(f"Fire probability: {prediction[0][0]}")
 
@@ -30,6 +45,7 @@ def detect_fire(image_path, threshold=0.6):
         return 1
     else:
         return 0
+
 
 # Path to the image
 image_path = "received_image.jpg"  # Replace with the path to your image
