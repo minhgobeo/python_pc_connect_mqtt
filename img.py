@@ -43,7 +43,7 @@ def detect_fire(image_path, threshold=0.6):
         return False
 
 # Path to the image
-image_path = "receive_image.png"  # Replace with the path to your image
+image_path = "lua_5.jfif"  # Replace with the path to your image
 
 # Detect fire in the image
 fire_detected = detect_fire(image_path)
