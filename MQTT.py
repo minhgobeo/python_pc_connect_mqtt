@@ -1,3 +1,4 @@
+
 import paho.mqtt.client as mqtt
 import numpy as np
 import cv2
@@ -45,18 +46,39 @@ def detect_fire(image_path, threshold=0.6):
         return 1
     else:
         return 0
+##############Hàm xử lý chuỗi binary từ hình ảnh#####################
+def get_picture(image_path, fire_detected, image_data):
+    #if msg.topic == topic_subscribe:
+    # image_data = msg.payload
+    # Dữ liệu nhận được là chuỗi byte từ ESP32-CAM
+    print("Receiving picture data...")
+    # Binary image data
+    # Giải mã thành mảng numpy
+    nparr = np.frombuffer(image_data, np.uint8)
+    # Chuyển đổi thành hình ảnh
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is not None:
+        print("Image received and decoded!")
+        # Hiển thị hình ảnh
+        # Lưu ảnh ra file nếu cần
+        cv2.imwrite(image_path, img)
+        fire_detected = detect_fire(image_path)  # giá trị fire detected trả về 1 nếu là có lửa, 0 là ko có lửa
+        client.publish(topic_publish, fire_detected)
+    else:
+        print("Failed to decode image.")
 
-
-# Path to the image
-image_path = "received_image.jpg"  # Replace with the path to your image
+# Đường dẫn ta image
+image_path_cam_1 = "received_image.jpg"  # Replace with the path to your image
+image_path_cam_2 = "received_image_1.jpg"
 
 ##############Cấu hình MQTT trên máy tính#####################
 # Cấu hình MQTT Broker
-mqtt_server = "bf9e78d9019447609bada8c1a9b76912.s1.eu.hivemq.cloud"  # Thay bằng hostname của bạn
+mqtt_server = "4838f20abef342ccba6a129cecb3ebe8.s1.eu.hivemq.cloud"  # Thay bằng hostname của bạn
 mqtt_port = 8883  # Cổng cho TLS
-mqtt_user = "test_MQQT"  # Thay bằng username của bạn
-mqtt_password = "123ABC456abc"  # Thay bằng password của bạn
-topic_subscribe = "sendToPC"  # Topic để nhận tin nhắn
+mqtt_user = "testaccount"  # Thay bằng username của bạn
+mqtt_password = "Test12345"  # Thay bằng password của bạn
+topic_subscribe_cam_1 = "cam/3/5"  # Topic để nhận dữ lieu tu cam
+topic_subscribe_cam_2 = "cam/3/6"  # Topic để nhận dữ lieu tu cam
 topic_publish = "sendfromPC"  # Topic để gửi tin nhắn
 
 # Tạo MQTT client
@@ -71,7 +93,8 @@ cam_value = 0 #chỉnh sau
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("Connected to HiveMQ!")
-        client.subscribe(topic_subscribe)  # Đăng ký vào topic
+        client.subscribe(topic_subscribe_cam_1)  # Đăng ký vào topic
+        client.subscribe(topic_subscribe_cam_2)
         client.subscribe("esp/1/1")
         client.subscribe("esp/2/1")
         client.subscribe("esp/3/1")
@@ -86,27 +109,16 @@ def on_connect(client, userdata, flags, rc):
 # Hàm xử lý khi nhận tin nhắn
 def on_message(client, userdata, msg):
     try:
-        if msg.topic == topic_subscribe:
-            # Dữ liệu nhận được là chuỗi byte từ ESP32-CAM
-            print("Receiving picture data...")
-            image_data = msg.payload  # Binary image data
-            # Giải mã thành mảng numpy
-
-            nparr = np.frombuffer(image_data, np.uint8)
-            # Chuyển đổi thành hình ảnh
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            if img is not None:
-                print("Image received and decoded!")
-                # Hiển thị hình ảnh
-                # Lưu ảnh ra file nếu cần
-                cv2.imwrite("received_image.jpg", img)
-            else:
-                print("Failed to decode image.")
+        fire_detected = 0
+        if msg.topic == topic_subscribe_cam_1:
+            get_picture(image_path_cam_1, fire_detected, msg.payload)
         # Gọi module phát hiện lửa
-        fire_detected = detect_fire(image_path) # giá trị fire detected trả về 1 nếu là có lửa, 0 là ko có lửa
-        client.publish(topic_publish, fire_detected)
+        #fire_detected = detect_fire(image_path) # giá trị fire detected trả về 1 nếu là có lửa, 0 là ko có lửa
+        #client.publish(topic_publish, fire_detected)
+        if msg.topic == topic_subscribe_cam_2:
+            get_picture(image_path_cam_2, fire_detected, msg.payload)
     # Này là mới xử lí một cam thôi, đến sau sẽ test hai cam
-        cam_value = userdata
+        cam_value = fire_detected
         message = msg.payload.decode()
         input_topic = msg.topic
         print(f"Received message: {message} on topic {input_topic}")
