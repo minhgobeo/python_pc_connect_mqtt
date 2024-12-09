@@ -63,9 +63,10 @@ def get_picture(image_path, fire_detected, image_data):
         # Lưu ảnh ra file nếu cần
         cv2.imwrite(image_path, img)
         fire_detected = detect_fire(image_path)  # giá trị fire detected trả về 1 nếu là có lửa, 0 là ko có lửa
-        client.publish(topic_publish, fire_detected)
+        return fire_detected
     else:
         print("Failed to decode image.")
+        return 0
 
 # Đường dẫn ta image
 image_path_cam_1 = "received_image.jpg"  # Replace with the path to your image
@@ -85,9 +86,8 @@ topic_publish = "sendfromPC"  # Topic để gửi tin nhắn
 client = mqtt.Client()
 client.username_pw_set(mqtt_user, mqtt_password)  # Cấu hình username và password
 client.tls_set()  # Kích hoạt kết nối TLS/SSL
-
-# Biến
-cam_value = 0 #chỉnh sau
+#Tạo biến
+cam_value = 0
 
 # Hàm xử lý khi kết nối thành công
 def on_connect(client, userdata, flags, rc):
@@ -108,29 +108,70 @@ def on_connect(client, userdata, flags, rc):
 
 # Hàm xử lý khi nhận tin nhắn
 def on_message(client, userdata, msg):
+    global output_topic_cam_1
+    global mdnh_cam_1
+    global output_topic_cam_2
+    global mdnh_cam_2
+    #global fire_detected
     try:
+        flag = 0
         fire_detected = 0
+        if msg.topic == "esp/3/5" :
+            message = msg.payload.decode()
+            input_topic = msg.topic
+            print(f"Received message: {message} on topic {input_topic}")
+
+            mdnh_cam_1 = f"{message}"
+            floorr = input_topic[4]
+            zone = input_topic[6]
+            output_topic_cam_1 = f"lap/{floorr}/{zone}"
+
+            flag = 1;
+
+        if msg.topic == "esp/3/6":
+            message = msg.payload.decode()
+            input_topic = msg.topic
+            print(f"Received message: {message} on topic {input_topic}")
+
+            mdnh_cam_2 = f"{message}"
+            floorr = input_topic[4]
+            zone = input_topic[6]
+            output_topic_cam_2 = f"lap/{floorr}/{zone}"
+
+            flag = 1;
+
         if msg.topic == topic_subscribe_cam_1:
-            get_picture(image_path_cam_1, fire_detected, msg.payload)
+            fire_detected = get_picture(image_path_cam_1, fire_detected, msg.payload)
+            mdnh_cam_1 = f"{fire_detected}{mdnh_cam_1}"
+
+            client.publish(output_topic_cam_1, mdnh_cam_1)
+            print(f"Published messenge: {mdnh_cam_1} on topic {output_topic_cam_1}")
+            flag = 1
         # Gọi module phát hiện lửa
         #fire_detected = detect_fire(image_path) # giá trị fire detected trả về 1 nếu là có lửa, 0 là ko có lửa
         #client.publish(topic_publish, fire_detected)
         if msg.topic == topic_subscribe_cam_2:
-            get_picture(image_path_cam_2, fire_detected, msg.payload)
-    # Này là mới xử lí một cam thôi, đến sau sẽ test hai cam
-        cam_value = fire_detected
-        message = msg.payload.decode()
-        input_topic = msg.topic
-        print(f"Received message: {message} on topic {input_topic}")
+            fire_detected = get_picture(image_path_cam_2, fire_detected, msg.payload)
 
-        mdnh = f"{cam_value}{message}"
-        if mdnh != '000':
-            floorr = input_topic[4]
-            zone = input_topic[6]
-            output_topic = f"lap/{floorr}/{zone}"
+            mdnh_cam_2 = f"{fire_detected}{mdnh_cam_2}"
 
-            client.publish(output_topic, mdnh)
-            print(f"Published messenge: {mdnh} on topic {output_topic}")
+            client.publish(output_topic_cam_2, mdnh_cam_2)
+            print(f"Published messenge: {mdnh_cam_2} on topic {output_topic_cam_2}")
+            flag = 1
+
+        if flag == 0:
+            message = msg.payload.decode()
+            input_topic = msg.topic
+            print(f"Received message: {message} on topic {input_topic}")
+
+            mdnh = f"{cam_value}{message}"
+            if mdnh != '000':
+                floorr = input_topic[4]
+                zone = input_topic[6]
+                output_topic = f"lap/{floorr}/{zone}"
+                client.publish(output_topic, mdnh)
+                print(f"Published messenge: {mdnh} on topic {output_topic}")
+
     except Exception as e:
         print(f"Error processing message from topic {msg.topic}: {e}")
 
