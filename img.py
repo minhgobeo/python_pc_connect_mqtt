@@ -6,7 +6,8 @@ import tensorflow as tf
 interpreter = tf.lite.Interpreter(model_path="model.tflite")
 interpreter.allocate_tensors()
 
-# Get input and output details
+# Get input and output details:q
+
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
